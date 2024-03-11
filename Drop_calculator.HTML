@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang='ko'>
+<head>
+<meta charset='UTF-8'>
+ <title>Monster Drop Probability</title>
+</head>
+<body>
+    <h1>Monster Drop Probability Calculator</h1>
+    <form id="drop-form">
+        <label for="monster-code">몬스터 코드:</label>
+        <input type="text" id="monster-code" name="monster-code"><br>
+        <label for="num-kills">잡은 마리수:</label>
+        <input type="text" id="num-kills" name="num-kills"><br>
+        <input type="submit" value="계산">
+    </form>
+    <hr>
+    <h2>아이템 한개 이상 드랍 확률</h2>
+    <p id="drop-probability"></p>
+    <table id="drop-table" border="1px">
+        <tr>
+            <th>아이템</th>
+            <th>드랍 확률</th>
+        </tr>
+    </table>
+    <script>
+        document.getElementById('drop-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            let monsterCode = document.getElementById('monster-code').value;
+            let numKills = parseInt(document.getElementById('num-kills').value);
+
+            async function getDropTable(monsterCode) {
+                let response = await fetch(`https://cors-anywhere.herokuapp.com/https://mapledb.kr/search.php?q=${monsterCode}&t=mob`);
+                let html = await response.text();
+                let parser = new DOMParser();
+                let doc = parser.parseFromString(html, 'text/html');
+
+                let dropTable = {};
+
+                let items = doc.querySelectorAll('a.search-page-add-content-box');
+                items.forEach(item => {
+                    let itemName = item.querySelector('h4.text-bold').textContent.trim();
+                    let dropRate = item.querySelector('span.text-bold-underline').textContent.trim();
+                    dropTable[itemName] = dropRate;
+                });
+
+                return dropTable;
+            }
+
+            function calculateDropProbability(dropTable, numKills) {
+                let dropProbability = {};
+
+                for (let item in dropTable) {
+                    let dropRate = dropTable[item];
+                    if (dropRate === "미확인") {
+                        dropProbability[item] = "미확인";
+                        continue;
+                    }
+                    let dropRateFloat = parseFloat(dropRate.replace('%', '')) / 100;
+                    let probability = 1 - Math.pow((1 - dropRateFloat), numKills);
+                    dropProbability[item] = `${(probability * 100).toFixed(6)}%`;
+                }
+
+                return dropProbability;
+            }
+
+            async function main() {
+                let dropTable = await getDropTable(monsterCode);
+
+                let dropProbability = calculateDropProbability(dropTable, numKills);
+                let probabilityOutput = document.getElementById('drop-probability');
+                probabilityOutput.innerHTML = "아이템 한개 이상 드랍 확률 (잡은 마리수: " + numKills + "):<br>";
+
+                let tableOutput = document.getElementById('drop-table');
+                tableOutput.innerHTML = "<tr><th>아이템</th><th>드랍 확률</th></tr>";
+
+                for (let item in dropProbability) {
+                    tableOutput.innerHTML += `<tr><td>${item}</td><td>${dropProbability[item]}</td></tr>`;
+                }
+            }
+
+            main();
+        });
+    </script>
+</body>
+</html>
